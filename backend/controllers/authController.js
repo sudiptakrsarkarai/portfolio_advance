@@ -6,17 +6,7 @@ import generateToken from '../middelware/generateCookies.js'; // Ensure this pat
 // It's highly recommended to use environment variables for secrets
 const JWT_SECRET = process.env.JWT_SECRET || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InVzZXIxMjMiLCJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE2ODk3NzA0NTAsImV4cCI6MTY4OTc3NDA1MCwiaXNzIjoieW91ci1hcHAtbmFtZSJ9.9vJ6U9cZJTXNkfUetJ3_tPU3YJTRk0U3km0eI1-mW-Y';
 
-// --- Helper Functions ---
-// (If generateToken isn't handling cookie setting, you might need it here)
-// For now, we assume generateToken handles both token creation and cookie setting.
 
-// --- Controller Functions ---
-
-/**
- * @desc    Register a new user
- * @route   POST /api/users/register
- * @access  Public
- */
 export const registerUser = async (req, res) => {
   try {
     const { email, password, name,role, dateOfBirth, phone } = req.body;
@@ -76,11 +66,6 @@ export const registerUser = async (req, res) => {
   }
 };
 
-/**
- * @desc    Authenticate user & get token (Login)
- * @route   POST /api/users/login
- * @access  Public
- */
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -109,11 +94,6 @@ export const loginUser = async (req, res) => {
   }
 };
 
-/**
- * @desc    Get current logged-in user's profile
- * @route   GET /api/users/profile
- * @access  Private (Requires Auth Middleware)
- */
 export const getCurrentUser = async (req, res) => {
   try {
     const token = req.user;
@@ -131,11 +111,6 @@ export const getCurrentUser = async (req, res) => {
   }
 };
 
-/**
- * @desc    Update user profile (including portfolio)
- * @route   PUT /api/users/profile
- * @access  Private (Requires Auth Middleware)
- */
 export const updateUserProfile = async (req, res) => {
     try {
         const userId = req.user?.userId;
@@ -228,7 +203,3 @@ export const getUserPublicProfile = async (req, res) => {
     }
 };
 
-// --- TODO: Add controllers for Friends & Stars ---
-// export const addFriend = async (req, res) => { ... };
-// export const removeFriend = async (req, res) => { ... };
-// export const starPortfolio = async (req, res) => { ... };

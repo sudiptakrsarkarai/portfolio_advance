@@ -5,6 +5,7 @@ import path from 'path';
 import cookieParser from 'cookie-parser';
 
 import authRoutes from './routes/authRoutes.js'
+import profileRoutes from './routes/profileRoutes.js';
 import connectionDB from './config/db.js';
 
 config();
@@ -27,6 +28,7 @@ app.get('/api',(req,res)=>{
 
 
 app.use('/api/user', authRoutes);
+app.use('/api/profile', profileRoutes);
 
 
 

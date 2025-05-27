@@ -69,8 +69,7 @@ const userSchema = new Schema({
 
   // --- Social Features ---
   friends: [{
-    type: Schema.Types.ObjectId,
-    ref: 'User' ,// Reference to other users
+    type: String,
     default:0
   }],
   stars: {

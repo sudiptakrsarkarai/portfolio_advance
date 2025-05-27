@@ -13,6 +13,7 @@ import Portfolio from "./pages/Portfolio";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ViewPortfolio from "./pages/ViewPortfolio";
+import UpdatePortfolio from "./pages/UpdatePortfolio";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/view/:id" element={<ViewPortfolio />} />
+            <Route path="/portfolio-create" element={<UpdatePortfolio />} />
             <Route 
               path="/portfolio" 
               element={

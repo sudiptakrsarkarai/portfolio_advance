@@ -1,4 +1,5 @@
 import User from '../models/userSchema.js'; // Adjust the path as necessary
+import mongoose from 'mongoose';
 
 /**
  * @desc    Create/Initialize user portfolio
@@ -237,24 +238,100 @@ export const deletePortfolio = async (req, res) => {
 };
 
 export const getStudentProfile = async (req, res) => {
+    // Helper function to get dynamic title based on portfolio
+    const getDynamicTitle = (portfolio) => {
+        if (!portfolio) return 'Student';
+        if (portfolio.experience && portfolio.experience.length > 0) {
+            const currentExperience = portfolio.experience.find(exp => !exp.endDate || new Date(exp.endDate) >= new Date());
+            if (currentExperience) {
+                return currentExperience.title + ' at ' + currentExperience.company;
+            }
+        }
+        if (portfolio.education && portfolio.education.length > 0) {
+            const latestEducation = portfolio.education.sort((a, b) => new Date(b.startDate) - new Date(a.startDate))[0];
+            return latestEducation.degree + ' from ' + latestEducation.institution;
+        }
+        if (portfolio.skills && portfolio.skills.length > 0) {
+            return portfolio.skills[0] + ' Developer';
+        }
+        return 'Student';
+    };
+
+    // Helper function to format projects for display
+    const formatProjects = (projects) => {
+        return projects.map(project => ({
+            title: project.title,
+            description: project.description,
+            link: project.link,
+            imageUrl: project.imageUrl
+        }));
+    };
+
+    // Helper function to format experience for display
+    const formatExperience = (experience) => {
+        return experience.map(exp => ({
+            title: exp.title,
+            company: exp.company,
+            startDate: exp.startDate,
+            endDate: exp.endDate,
+            description: exp.description
+        }));
+    };
+
+    // Helper function to format education for display
+    const formatEducation = (education) => {
+        return education.map(edu => ({
+            degree: edu.degree,
+            institution: edu.institution,
+            startDate: edu.startDate,
+            endDate: edu.endDate
+        }));
+    };
+
+    // Helper function to determine last active text
+    const getLastActiveText = (createdAt) => {
+        const diffMs = Date.now() - new Date(createdAt).getTime();
+        const minutes = Math.floor(diffMs / (1000 * 60));
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+        const months = Math.floor(days / 30);
+        const years = Math.floor(months / 12);
+
+        if (minutes < 5) return 'just now';
+        if (minutes < 60) return `${minutes} minutes ago`;
+        if (hours < 24) return `${hours} hours ago`;
+        if (days < 30) return `${days} days ago`;
+        if (months < 12) return `${months} months ago`;
+        return `${years} years ago`;
+    };
+
+    // Helper function to check online status (simple check based on last activity)
+    const checkOnlineStatus = (createdAt) => {
+        const fiveMinutes = 5 * 60 * 1000;
+        return (Date.now() - new Date(createdAt).getTime()) < fiveMinutes;
+    };
+
+
     try {
         const { userId } = req.params;
-        
+
         // Validate userId format
         if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ 
-                message: 'Invalid user ID format' 
+            return res.status(400).json({
+                message: 'Invalid user ID format'
             });
         }
 
-        // Find user with all necessary fields
-        const user = await User.findById(userId)
-            .select('name email portfolio friends stars createdAt dateOfBirth phone')
-            .lean(); // Use lean() for better performance
+        // Find user, explicitly selecting fields that are not selected by default (e.g., password is 'select: false')
+        // By default, Mongoose returns all fields except those with 'select: false'.
+        // So, if we want *all* data visible to the public, we don't need a .select()
+        // unless we want to explicitly exclude fields that are NOT 'select: false'
+        // and are sensitive. In this case, 'password' is already excluded.
+        const user = await User.findById(userId).lean();
 
         if (!user) {
-            return res.status(404).json({ 
-                message: 'Student profile not found' 
+            return res.status(404).json({
+                message: 'Student profile not found'
             });
         }
 
@@ -294,11 +371,11 @@ export const getStudentProfile = async (req, res) => {
             email: user.email,
             avatar: user.portfolio?.avatar || '/default-avatar.png',
             bio: user.portfolio?.bio || 'No bio available',
-            
+
             // Professional Info
             title: getDynamicTitle(user.portfolio),
             skills: user.portfolio?.skills || [],
-            
+
             // Statistics
             stats: {
                 projects: stats.projectsCount,
@@ -306,20 +383,20 @@ export const getStudentProfile = async (req, res) => {
                 views: stats.viewsCount,
                 stars: user.stars || 0
             },
-            
+
             // Detailed Sections
             projects: formatProjects(user.portfolio?.projects || []),
             experience: formatExperience(user.portfolio?.experience || []),
             education: formatEducation(user.portfolio?.education || []),
             socialLinks: user.portfolio?.socialLinks || {},
-            
+
             // Meta Information
             memberSince: user.createdAt,
             lastActive: lastActiveText,
             accountAgeDays: accountAge,
             profileCompletion: completionPercentage,
             isOnline: checkOnlineStatus(user.createdAt), // Simple online check
-            
+
             // Contact Info (if available)
             contactInfo: {
                 phone: user.phone || null,

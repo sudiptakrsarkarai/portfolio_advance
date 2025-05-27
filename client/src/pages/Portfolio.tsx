@@ -21,7 +21,7 @@ import api from "../api/axios.js"; // Your configured axios instance
 const Home = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterBy, setFilterBy] = useState("all");
+  const [filterBy, setFilterBy] = useState("all"); // 'all', 'friends', 'connected'
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,7 +29,7 @@ const Home = () => {
     totalUsers: 0,
     totalStars: 0,
     totalProjects: 0,
-    totalSkills: 0, // This is likely from a dedicated stats endpoint
+    totalSkills: 0,
   });
 
   // Check for user authentication on mount
@@ -63,88 +63,61 @@ const Home = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch students
+      // Fetch students with search and filter parameters
       const studentParams = {
         search: searchTerm,
+        filterBy: filterBy, // Pass filterBy to backend
       };
 
-      const studentsResponse = await api.get('profile/profiles', { params: studentParams });
-      let fetchedStudents = studentsResponse.data.data;
-
-      // Client-side filtering for 'friends' and 'connected' if backend doesn't support directly
-      if (user) { // Only apply if user is logged in
-        if (filterBy === "friends") {
-          // Use a robust way to get student ID for comparison
-          fetchedStudents = fetchedStudents.filter(student => {
-            const studentId = student._id || student.id;
-            return user.friends && user.friends.includes(studentId);
-          });
-        } else if (filterBy === "connected") {
-          // Assuming 'connected' implies mutual friendship or a specific connection type
-          fetchedStudents = fetchedStudents.filter(student => {
-            const studentId = student._id || student.id;
-            return user.friends && user.friends.includes(studentId);
-          });
-        }
+      // Only include filterBy if the user is logged in for 'friends' or 'connected'
+      if (!user && (filterBy === "friends" || filterBy === "connected")) {
+        // If not logged in, revert filter to 'all' or show a message
+        console.warn("Cannot filter by friends/connected without being logged in.");
+        setFilterBy("all"); // Revert filter to 'all' if user is not logged in
+        return; // Exit early
       }
+
+      const studentsResponse = await api.get('profile/profiles', { params: studentParams });
+      const fetchedStudents = studentsResponse.data.data;
 
       // Map backend data to frontend structure with robust property access
       const formattedStudents = fetchedStudents.map(s => {
-        // Determine the correct ID to use (_id or id)
-        const studentIdentifier = s._id || s.id;
-        
-        // Essential checks: a valid identifier and a name
-        // Added a check for 's.name' to ensure it's not just an empty string
-        if (!studentIdentifier || typeof s.name !== 'string' || s.name.trim() === '') {
-          console.warn("Skipping malformed student data (missing _id/id or valid name):", s);
-          return null; // Return null for malformed entries
+        // Essential checks for a valid student profile
+        if (!s.id || typeof s.name !== 'string' || s.name.trim() === '') {
+          console.warn("Skipping malformed student data (missing id or valid name):", s);
+          return null;
         }
 
-        // --- Flexible property access ---
-        const studentName = s.name;
-        const studentAvatar = s.avatar || s.profileImage || "https://via.placeholder.com/150"; 
-        const studentTitle = s.portfolio?.bio?.title || s.title || "Student";
-        const studentSkills = s.portfolio?.skills || s.skills || [];
-        const studentBio = s.portfolio?.bio?.about || s.bio || "No bio available.";
-        
-        // Projects: Check for array length or direct count
-        const studentProjects = s.portfolio?.projects?.length || s.projects?.length || s.projectCount || 0;
-        // Friends: Check for array length or direct count
-        const studentFriends = s.friends?.length || s.friendCount || 0;
-        // Rating: Check for 'stars' or a direct 'rating' field
-        const studentRating = s.stars ? s.stars / 10 : (s.rating || 0); // Assuming stars/10 or direct rating
-        // Views: Check for analytics.views or a direct 'views' field
-        const studentPortfolioViews = s.analytics?.views || s.views || 0;
-        // Last Active: Check multiple potential fields
-        const studentLastActive = s.lastActive || s.updatedAt || s.createdAt; // Add fallback for last active
+        // Determine status based on logged-in user's friends list
+        // Assuming user.friends is an array of friend IDs
+        const isFriend = user && user.friends && user.friends.includes(s.id);
+        const status = isFriend ? "friend" : "stranger"; // You might need a more complex "connected" logic if different from "friend"
 
         return {
-          id: studentIdentifier,
-          name: studentName,
-          avatar: studentAvatar,
-          title: studentTitle,
-          skills: studentSkills,
-          rating: parseFloat(studentRating.toFixed(1)), // Ensure rating is a fixed-point number
-          portfolioViews: studentPortfolioViews,
-          projects: studentProjects,
-          friends: studentFriends,
-          status: user && user.friends && user.friends.includes(studentIdentifier) ? "friend" : "stranger",
-          lastActive: studentLastActive ? new Date(studentLastActive).toLocaleDateString() : "N/A",
-          bio: studentBio,
+          id: s.id,
+          name: s.name,
+          avatar: s.avatar || '/default-avatar.png', // Backend provides 'avatar' directly
+          title: s.title || 'No title available', // Backend provides 'title' directly
+          skills: s.skills || [], // Backend provides 'skills' directly
+          bio: s.bio || 'No bio available', // Backend provides 'bio' directly
+          projects: s.stats?.projects || 0, // Access from 'stats' object
+          friends: s.stats?.friends || 0, // Access from 'stats' object
+          rating: s.stats?.stars || 0, // Access from 'stats' object, backend sends 'stars'
+          portfolioViews: s.portfolioViews || 0, // If backend adds this, otherwise default 0
+          memberSince: s.memberSince, // Backend provides 'memberSince' directly
+          status: status,
         };
       }).filter(Boolean); // Filter out any null entries
 
       setStudents(formattedStudents);
 
       // Fetch platform statistics
-      // Ensure your backend's /profile/stats/platform endpoint actually returns
-      // these values, or adjust the mapping here as well if the field names differ.
       const statsResponse = await api.get('profile/stats/platform');
       setPlatformStats({
         totalUsers: statsResponse.data.data.platform?.totalUsers || 0,
         totalStars: statsResponse.data.data.platform?.totalStars || 0,
         totalProjects: statsResponse.data.data.platform?.totalProjects || 0,
-        totalSkills: statsResponse.data.data.platform?.totalSkills || 0, // Assuming this exists
+        totalSkills: statsResponse.data.data.platform?.totalSkills || 0,
       });
 
     } catch (err) {
@@ -165,9 +138,9 @@ const Home = () => {
       return;
     }
     if (!studentId) {
-        console.error("Cannot send connection request: studentId is undefined or null.");
-        alert("Error: Student ID is missing. Please try again.");
-        return;
+      console.error("Cannot send connection request: studentId is undefined or null.");
+      alert("Error: Student ID is missing. Please try again.");
+      return;
     }
     try {
       // Optimistic update
@@ -198,15 +171,15 @@ const Home = () => {
       return;
     }
     if (!studentId) {
-        console.error("Cannot star profile: studentId is undefined or null.");
-        alert("Error: Student ID is missing. Please try again.");
-        return;
+      console.error("Cannot star profile: studentId is undefined or null.");
+      alert("Error: Student ID is missing. Please try again.");
+      return;
     }
     try {
       // Optimistic update (adjusting rating based on a conceptual 'star' action, actual rating might differ)
       setStudents(prev => prev.map(student =>
         student.id === studentId
-          ? { ...student, rating: parseFloat((student.rating + 0.1).toFixed(1)) } // Increment rating slightly
+          ? { ...student, rating: student.rating + 1 } // Increment rating by 1 for a star
           : student
       ));
       await api.post(`profile/profile/${studentId}/star`);
@@ -218,7 +191,7 @@ const Home = () => {
       // Revert optimistic update on error
       setStudents(prev => prev.map(student =>
         student.id === studentId
-          ? { ...student, rating: parseFloat((student.rating - 0.1).toFixed(1)) } // Revert rating
+          ? { ...student, rating: student.rating - 1 } // Revert rating
           : student
       ));
     }
@@ -228,7 +201,7 @@ const Home = () => {
     switch (status) {
       case "friend":
         return <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">Friend</span>;
-      case "connected":
+      case "connected": // You might define "connected" differently if it's not just "friend"
         return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">Connected</span>;
       case "pending":
         return <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">Pending</span>;
@@ -341,7 +314,9 @@ const Home = () => {
                 <div className="flex items-center">
                   <Heart className="w-8 h-8 text-green-500" />
                   <div className="ml-4">
-                    <p className="text-2xl font-bold text-gray-900">{user ? students.filter(s => s.status === "friend").length : 'N/A'}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {user ? students.filter(s => s.status === "friend").length : 'N/A'}
+                    </p>
                     <p className="text-sm text-gray-600">Your Friends</p>
                   </div>
                 </div>
@@ -351,7 +326,9 @@ const Home = () => {
                 <div className="flex items-center">
                   <MessageCircle className="w-8 h-8 text-purple-500" />
                   <div className="ml-4">
-                    <p className="text-2xl font-bold text-gray-900">{user ? students.filter(s => s.status === "connected").length : 'N/A'}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {user ? students.filter(s => s.status === "connected").length : 'N/A'}
+                    </p>
                     <p className="text-sm text-gray-600">Your Connections</p>
                   </div>
                 </div>
@@ -381,7 +358,7 @@ const Home = () => {
                       <img
                         src={student.avatar}
                         alt={student.name}
-                        className="w-12 h-12 rounded-full border-4 border-white shadow-sm object-cover" // Added object-cover
+                        className="w-12 h-12 rounded-full border-4 border-white shadow-sm object-cover"
                       />
                     </div>
                     <div className="absolute top-4 right-4">
@@ -436,7 +413,9 @@ const Home = () => {
                     </div>
 
                     {/* Last Active */}
-                    <p className="text-xs text-gray-500 mb-4">Active {student.lastActive}</p>
+                    <p className="text-xs text-gray-500 mb-4">
+                        Active {student.memberSince ? new Date(student.memberSince).toLocaleDateString() : "N/A"}
+                    </p>
 
                     {/* Action Buttons */}
                     <div className="flex gap-2">

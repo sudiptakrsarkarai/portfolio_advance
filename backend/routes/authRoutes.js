@@ -14,52 +14,53 @@ const router = Router();
 
 // --- Authentication Routes ---
 
-/**
- * @route   POST /api/users/register
- * @desc    Register a new user
- * @access  Public
- */
 router.post('/register', registerUser);
 
-/**
- * @route   POST /api/users/login
- * @desc    Login user & get token
- * @access  Public
- */
 router.post('/login', loginUser);
 
-// --- User Profile Routes ---
-
-/**
- * @route   GET /api/users/me
- * @desc    Get the logged-in user's profile
- * @access  Private (Requires Token)
- */
 router.get('/me', verifyToken, getCurrentUser);
 
-/**
- * @route   PUT /api/users/me
- * @desc    Update the logged-in user's profile
- * @access  Private (Requires Token)
- */
 router.put('/me', verifyToken, updateUserProfile);
 
-/**
- * @route   GET /api/users/:id
- * @desc    Get a user's public profile by ID
- * @access  Public
- */
 router.get('public/:id', getUserPublicProfile);
 
 
 // --- Optional: Add Logout ---
 router.post('/logout', (req, res) => {
-  // Logic to handle logout, usually involves clearing the cookie
-  res.cookie('jwt', '', {
+  try {
+    // Clear multiple possible cookie names that might store the JWT
+    const cookieOptions = {
       httpOnly: true,
-      expires: new Date(0),
-  });
-  res.status(200).json({ message: 'Logged out successfully' });
+      secure: process.env.NODE_ENV === 'production', // Only secure in production
+      sameSite: 'strict',
+      expires: new Date(0), // Set expiration to past date
+      path: '/' // Ensure path matches the one used when setting
+    };
+
+    // Clear common JWT cookie names
+    res.clearCookie('jwt', cookieOptions);
+    res.clearCookie('token', cookieOptions);
+    res.clearCookie('authToken', cookieOptions);
+    res.clearCookie('accessToken', cookieOptions);
+    
+    // Also set them to empty string as backup
+    res.cookie('jwt', '', cookieOptions);
+    res.cookie('token', '', cookieOptions);
+    res.cookie('authToken', '', cookieOptions);
+    res.cookie('accessToken', '', cookieOptions);
+
+    // Send success response
+    res.status(200).json({ 
+      success: true,
+      message: 'Logged out successfully' 
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error during logout' 
+    });
+  }
 });
 
 

@@ -111,6 +111,7 @@ export const getCurrentUser = async (req, res) => {
   }
 };
 
+
 export const updateUserProfile = async (req, res) => {
     try {
         const userId = req.user?.userId;

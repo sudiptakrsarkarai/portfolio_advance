@@ -110,7 +110,7 @@ router.post('/profile/:userId/star', verifyToken, async (req, res) => {
         }
 
         // Import User model (you'll need to add this import at the top)
-        const User = (await import('../models/User.js')).default;
+        const User = (await import('../models/userSchema.js')).default;
         
         const user = await User.findById(userId);
         if (!user) {

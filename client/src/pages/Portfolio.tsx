@@ -176,24 +176,32 @@ const Home = () => {
       return;
     }
     try {
-      // Optimistic update (adjusting rating based on a conceptual 'star' action, actual rating might differ)
+      // Optimistic update
       setStudents(prev => prev.map(student =>
         student.id === studentId
           ? { ...student, rating: student.rating + 1 } // Increment rating by 1 for a star
           : student
       ));
-      await api.post(`profile/profile/${studentId}/star`);
+      
+      const response = await api.post(`profile/profile/${studentId}/star`);
+      
+      // Check if the backend response contains the updated star count
+      if (response.data && response.data.data && response.data.data.newStars !== undefined) {
+        setStudents(prev => prev.map(student =>
+          student.id === studentId
+            ? { ...student, rating: response.data.data.newStars } // Update with actual stars from backend
+            : student
+        ));
+      } else {
+        // Fallback: If backend doesn't send newStars, re-fetch all students
+        fetchStudentsAndStats(); 
+      }
       alert("Profile starred!");
-      fetchStudentsAndStats(); // Re-fetch to get accurate star count
     } catch (err) {
       console.error("Error starring profile:", err);
       setError("Failed to star profile.");
-      // Revert optimistic update on error
-      setStudents(prev => prev.map(student =>
-        student.id === studentId
-          ? { ...student, rating: student.rating - 1 } // Revert rating
-          : student
-      ));
+      // Revert optimistic update on error by re-fetching
+      fetchStudentsAndStats(); 
     }
   };
 
